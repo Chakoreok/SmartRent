@@ -1,5 +1,5 @@
-# Use official PHP with Apache
-FROM php:8.2-apache
+# Use PHP 8.4 (required by your composer.lock)
+FROM php:8.4-apache
 
 # Install required PHP extensions for Laravel
 RUN apt-get update && apt-get install -y \
@@ -30,11 +30,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Install Laravel dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Set permissions for Laravel storage and cache
+# Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port
 EXPOSE 10000
 
-# Start Apache
 CMD ["apache2-foreground"]
