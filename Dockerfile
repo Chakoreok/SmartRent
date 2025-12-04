@@ -3,8 +3,8 @@ FROM php:8.2-apache
 
 # Install required PHP extensions for Laravel
 RUN apt-get update && apt-get install -y \
-    git unzip libpq-dev libzip-dev zip libxml2-dev zlib1g-dev \
-    && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip bcmath mbstring tokenizer xml
+    git unzip libpq-dev libzip-dev zip libxml2-dev zlib1g-dev libonig-dev \
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip bcmath mbstring
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
