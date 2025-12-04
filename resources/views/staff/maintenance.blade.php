@@ -148,7 +148,11 @@
                     <div class="flex items-center text-sm text-gray-600">
                         <i class="fas fa-calendar w-4 mr-3"></i>
                         <span class="flex-1">
-                            Requested: {{ $request->requested_at->format('M d, Y') }}
+                            @if($request->requested_at)
+                                Requested: {{ $request->requested_at->format('M d, Y') }}
+                            @else
+                                Requested: Date not available
+                            @endif
                             @if($request->days_open > 0)
                                 <span class="ml-2 {{ $request->days_open > 7 ? 'text-red-600' : 'text-orange-600' }} font-medium">
                                     ({{ $request->days_open }} day{{ $request->days_open > 1 ? 's' : '' }})

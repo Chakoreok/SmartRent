@@ -132,7 +132,7 @@ function openAddDeviceModal(propertyId) {
 
     // Add smart defaults for device types
     const deviceTypeSelect = modalContainer.querySelector(
-        ".device-type-select",
+        ".device-type-select"
     );
     deviceTypeSelect.addEventListener("change", function () {
         setDeviceSmartDefaults(this);
@@ -220,10 +220,24 @@ async function addSmartDevice(propertyId) {
                     Accept: "application/json",
                 },
                 body: JSON.stringify(deviceData),
-            },
+            }
         );
 
-        const result = await response.json();
+        const result = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
 
         if (!response.ok) {
             throw new Error(result.message || "Failed to add device");
@@ -254,7 +268,21 @@ async function editSmartDevice(deviceId) {
             throw new Error("Failed to fetch device data");
         }
 
-        const device = await response.json();
+        const device = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
 
         const modalContent = `
             <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -278,7 +306,9 @@ async function editSmartDevice(deviceId) {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Device Name</label>
-                                <input type="text" name="device_name" value="${device.device_name}" required 
+                                <input type="text" name="device_name" value="${
+                                    device.device_name
+                                }" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                             
@@ -286,16 +316,56 @@ async function editSmartDevice(deviceId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Device Type</label>
                                 <select name="device_type" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="thermostat" ${device.device_type === "thermostat" ? "selected" : ""}>Thermostat</option>
-                                    <option value="camera" ${device.device_type === "camera" ? "selected" : ""}>Security Camera</option>
-                                    <option value="lock" ${device.device_type === "lock" ? "selected" : ""}>Smart Lock</option>
-                                    <option value="lights" ${device.device_type === "lights" ? "selected" : ""}>Smart Lights</option>
-                                    <option value="sensor" ${device.device_type === "sensor" ? "selected" : ""}>Motion Sensor</option>
-                                    <option value="doorbell" ${device.device_type === "doorbell" ? "selected" : ""}>Smart Doorbell</option>
-                                    <option value="plug" ${device.device_type === "plug" ? "selected" : ""}>Smart Plug</option>
-                                    <option value="alarm" ${device.device_type === "alarm" ? "selected" : ""}>Alarm System</option>
-                                    <option value="blinds" ${device.device_type === "blinds" ? "selected" : ""}>Smart Blinds</option>
-                                    <option value="speaker" ${device.device_type === "speaker" ? "selected" : ""}>Smart Speaker</option>
+                                    <option value="thermostat" ${
+                                        device.device_type === "thermostat"
+                                            ? "selected"
+                                            : ""
+                                    }>Thermostat</option>
+                                    <option value="camera" ${
+                                        device.device_type === "camera"
+                                            ? "selected"
+                                            : ""
+                                    }>Security Camera</option>
+                                    <option value="lock" ${
+                                        device.device_type === "lock"
+                                            ? "selected"
+                                            : ""
+                                    }>Smart Lock</option>
+                                    <option value="lights" ${
+                                        device.device_type === "lights"
+                                            ? "selected"
+                                            : ""
+                                    }>Smart Lights</option>
+                                    <option value="sensor" ${
+                                        device.device_type === "sensor"
+                                            ? "selected"
+                                            : ""
+                                    }>Motion Sensor</option>
+                                    <option value="doorbell" ${
+                                        device.device_type === "doorbell"
+                                            ? "selected"
+                                            : ""
+                                    }>Smart Doorbell</option>
+                                    <option value="plug" ${
+                                        device.device_type === "plug"
+                                            ? "selected"
+                                            : ""
+                                    }>Smart Plug</option>
+                                    <option value="alarm" ${
+                                        device.device_type === "alarm"
+                                            ? "selected"
+                                            : ""
+                                    }>Alarm System</option>
+                                    <option value="blinds" ${
+                                        device.device_type === "blinds"
+                                            ? "selected"
+                                            : ""
+                                    }>Smart Blinds</option>
+                                    <option value="speaker" ${
+                                        device.device_type === "speaker"
+                                            ? "selected"
+                                            : ""
+                                    }>Smart Speaker</option>
                                 </select>
                             </div>
                         </div>
@@ -303,13 +373,17 @@ async function editSmartDevice(deviceId) {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Model</label>
-                                <input type="text" name="model" value="${device.model || ""}"
+                                <input type="text" name="model" value="${
+                                    device.model || ""
+                                }"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                             
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Serial Number</label>
-                                <input type="text" name="serial_number" value="${device.serial_number || ""}"
+                                <input type="text" name="serial_number" value="${
+                                    device.serial_number || ""
+                                }"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                         </div>
@@ -319,8 +393,16 @@ async function editSmartDevice(deviceId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Connection Status</label>
                                 <select name="connection_status" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="online" ${device.connection_status === "online" ? "selected" : ""}>Online</option>
-                                    <option value="offline" ${device.connection_status === "offline" ? "selected" : ""}>Offline</option>
+                                    <option value="online" ${
+                                        device.connection_status === "online"
+                                            ? "selected"
+                                            : ""
+                                    }>Online</option>
+                                    <option value="offline" ${
+                                        device.connection_status === "offline"
+                                            ? "selected"
+                                            : ""
+                                    }>Offline</option>
                                 </select>
                             </div>
                             
@@ -328,15 +410,25 @@ async function editSmartDevice(deviceId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Power Status</label>
                                 <select name="power_status" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="on" ${device.power_status === "on" ? "selected" : ""}>On</option>
-                                    <option value="off" ${device.power_status === "off" ? "selected" : ""}>Off</option>
+                                    <option value="on" ${
+                                        device.power_status === "on"
+                                            ? "selected"
+                                            : ""
+                                    }>On</option>
+                                    <option value="off" ${
+                                        device.power_status === "off"
+                                            ? "selected"
+                                            : ""
+                                    }>Off</option>
                                 </select>
                             </div>
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Battery Level (%)</label>
-                            <input type="number" name="battery_level" value="${device.battery_level || ""}" min="0" max="100"
+                            <input type="number" name="battery_level" value="${
+                                device.battery_level || ""
+                            }" min="0" max="100"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <p class="mt-1 text-sm text-gray-500">Leave empty if device doesn't have a battery</p>
                         </div>
@@ -414,7 +506,21 @@ async function updateSmartDevice(deviceId) {
             body: JSON.stringify(deviceData),
         });
 
-        const result = await response.json();
+        const result = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
 
         if (!response.ok) {
             throw new Error(result.message || "Failed to update device");
@@ -429,7 +535,7 @@ async function updateSmartDevice(deviceId) {
 
         // Refresh the parent property edit modal
         const propertyId = document.querySelector(
-            'input[name="prop_id"]',
+            'input[name="prop_id"]'
         )?.value;
         if (propertyId) {
             refreshDevicesList(propertyId);
@@ -446,7 +552,7 @@ async function updateSmartDevice(deviceId) {
 async function deleteSmartDevice(deviceId) {
     if (
         !confirm(
-            "Are you sure you want to delete this device? This action cannot be undone.",
+            "Are you sure you want to delete this device? This action cannot be undone."
         )
     ) {
         return;
@@ -464,7 +570,21 @@ async function deleteSmartDevice(deviceId) {
             },
         });
 
-        const result = await response.json();
+        const result = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
 
         if (!response.ok) {
             throw new Error(result.message || "Failed to delete device");
@@ -476,7 +596,7 @@ async function deleteSmartDevice(deviceId) {
 
         // Refresh devices list
         const propertyId = document.querySelector(
-            'input[name="prop_id"]',
+            'input[name="prop_id"]'
         )?.value;
         if (propertyId) {
             refreshDevicesList(propertyId);
@@ -493,7 +613,7 @@ async function deleteSmartDevice(deviceId) {
 async function archiveDevice(deviceId) {
     if (
         !confirm(
-            "Are you sure you want to archive this device? The device will be marked as archived and hidden from active listings.",
+            "Are you sure you want to archive this device? The device will be marked as archived and hidden from active listings."
         )
     ) {
         return;
@@ -511,10 +631,24 @@ async function archiveDevice(deviceId) {
                         .getAttribute("content"),
                     Accept: "application/json",
                 },
-            },
+            }
         );
 
-        const result = await response.json();
+        const result = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
 
         if (!response.ok) {
             throw new Error(result.message || "Failed to archive device");
@@ -526,7 +660,7 @@ async function archiveDevice(deviceId) {
 
         // Refresh devices list
         const propertyId = document.querySelector(
-            'input[name="prop_id"]',
+            'input[name="prop_id"]'
         )?.value;
         if (propertyId) {
             refreshDevicesList(propertyId);
@@ -543,14 +677,28 @@ async function archiveDevice(deviceId) {
 async function refreshDevicesList(propertyId) {
     try {
         const response = await fetch(
-            `/landlord/properties/${propertyId}/devices`,
+            `/landlord/properties/${propertyId}/devices`
         );
 
         if (!response.ok) {
             throw new Error("Failed to fetch devices");
         }
 
-        const devices = await response.json();
+        const devices = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
         const devicesContainer = document.getElementById("editDevicesList");
 
         if (!devicesContainer) return;
@@ -571,12 +719,18 @@ async function refreshDevicesList(propertyId) {
                 (device) => `
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div class="flex justify-between items-start mb-3">
-                    <h4 class="font-semibold text-gray-900">${device.device_name}</h4>
+                    <h4 class="font-semibold text-gray-900">${
+                        device.device_name
+                    }</h4>
                     <div class="flex space-x-2">
-                        <button onclick="editDevice(${device.device_id})" class="text-blue-600 hover:text-blue-800">
+                        <button onclick="editDevice(${
+                            device.device_id
+                        })" class="text-blue-600 hover:text-blue-800">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button onclick="deleteDevice(${device.device_id})" class="text-red-600 hover:text-red-800">
+                        <button onclick="deleteDevice(${
+                            device.device_id
+                        })" class="text-red-600 hover:text-red-800">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -588,13 +742,21 @@ async function refreshDevicesList(propertyId) {
                     </div>
                     <div class="flex justify-between">
                         <span>Status:</span>
-                        <span class="px-2 py-1 rounded-full text-xs font-medium ${device.connection_status === "online" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                            device.connection_status === "online"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                        }">
                             ${device.connection_status}
                         </span>
                     </div>
                     <div class="flex justify-between">
                         <span>Power:</span>
-                        <span class="capitalize ${device.power_status === "on" ? "text-green-600" : "text-red-600"}">${device.power_status}</span>
+                        <span class="capitalize ${
+                            device.power_status === "on"
+                                ? "text-green-600"
+                                : "text-red-600"
+                        }">${device.power_status}</span>
                     </div>
                     ${
                         device.model
@@ -618,7 +780,7 @@ async function refreshDevicesList(propertyId) {
                     }
                 </div>
             </div>
-        `,
+        `
             )
             .join("");
     } catch (error) {
@@ -686,7 +848,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (name) {
                     input.setAttribute(
                         "name",
-                        name.replace(/devices\[\d+\]/, `devices[${index}]`),
+                        name.replace(/devices\[\d+\]/, `devices[${index}]`)
                     );
                 }
             });
@@ -697,7 +859,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const deviceItem = selectElement.closest(".device-item");
         const deviceType = selectElement.value;
         const deviceNameInput = deviceItem.querySelector(
-            'input[name*="device_name"]',
+            'input[name*="device_name"]'
         );
         const modelInput = deviceItem.querySelector('input[name*="model"]');
 
@@ -736,3 +898,11 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
+
+export {
+    openAddDeviceModal,
+    addSmartDevice,
+    editSmartDevice,
+    deleteSmartDevice,
+    refreshDevicesList,
+};

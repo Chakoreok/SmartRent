@@ -169,7 +169,11 @@
                             <div class="text-right">
                                 <p class="text-sm text-gray-600">{{ $request->tenant_name }}</p>
                                 <p class="text-xs text-gray-500">
-                                    Requested {{ $request->requested_at->diffForHumans() }}
+                                    @if($request->requested_at)
+                                        Requested {{ $request->requested_at->diffForHumans() }}
+                                    @else
+                                        Date not available
+                                    @endif
                                 </p>
                             </div>
                         </div>

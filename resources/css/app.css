@@ -1,6 +1,6 @@
 /* Import Tailwind */
-@tailwind base;
-@tailwind components;
+@tailwindcss preflight;
+@tailwind utilities;
 @tailwind utilities;
 
 /* Import Google Fonts */

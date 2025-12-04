@@ -1,4 +1,16 @@
 // unit.js - Updated to avoid conflicts
+// Helper: ensure JSON responses are validated before parsing
+async function parseJsonOrThrow(response) {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response from server:", response.status, text);
+        throw new Error(
+            `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+        );
+    }
+    return await response.json();
+}
 function openAddUnitModal(propertyId) {
     const modalContent = `
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -128,6 +140,15 @@ function openAddUnitModal(propertyId) {
         });
 }
 
+export {
+    openAddUnitModal,
+    addPropertyUnit,
+    editPropertyUnit,
+    deletePropertyUnit,
+    switchEditTab,
+    refreshUnitsList,
+};
+
 // Edit Property Modal
 async function openEditPropertyModal(propertyId) {
     try {
@@ -139,7 +160,7 @@ async function openEditPropertyModal(propertyId) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const property = await response.json();
+        const property = await parseJsonOrThrow(response);
         console.log("Property data for edit:", property);
 
         // Load units and devices data
@@ -148,8 +169,12 @@ async function openEditPropertyModal(propertyId) {
             fetch(`/landlord/properties/${propertyId}/devices`),
         ]);
 
-        const units = unitsResponse.ok ? await unitsResponse.json() : [];
-        const devices = devicesResponse.ok ? await devicesResponse.json() : [];
+        const units = unitsResponse.ok
+            ? await parseJsonOrThrow(unitsResponse)
+            : [];
+        const devices = devicesResponse.ok
+            ? await parseJsonOrThrow(devicesResponse)
+            : [];
 
         const modalContent = `
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-y-auto">
@@ -159,7 +184,9 @@ async function openEditPropertyModal(propertyId) {
                             <i class="fas fa-edit text-blue-600 text-lg"></i>
                         </div>
                         <div>
-                            <h2 class="text-xl font-bold text-gray-900">Edit Property - ${property.property_name}</h2>
+                            <h2 class="text-xl font-bold text-gray-900">Edit Property - ${
+                                property.property_name
+                            }</h2>
                             <p class="text-sm text-gray-500">Update property information, units, and smart devices</p>
                         </div>
                     </div>
@@ -191,26 +218,55 @@ async function openEditPropertyModal(propertyId) {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Property Name</label>
-                                <input type="text" name="property_name" value="${property.property_name}" required 
+                                <input type="text" name="property_name" value="${
+                                    property.property_name
+                                }" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
                                 <select name="property_type" required 
                                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="apartment" ${property.property_type === "apartment" ? "selected" : ""}>Apartment Complex</option>
-                                    <option value="condo" ${property.property_type === "condo" ? "selected" : ""}>Condominium</option>
-                                    <option value="townhouse" ${property.property_type === "townhouse" ? "selected" : ""}>Townhouse</option>
-                                    <option value="single-family" ${property.property_type === "single-family" ? "selected" : ""}>Single Family Home</option>
-                                    <option value="duplex" ${property.property_type === "duplex" ? "selected" : ""}>Duplex</option>
-                                    <option value="commercial" ${property.property_type === "commercial" ? "selected" : ""}>Commercial</option>
+                                    <option value="apartment" ${
+                                        property.property_type === "apartment"
+                                            ? "selected"
+                                            : ""
+                                    }>Apartment Complex</option>
+                                    <option value="condo" ${
+                                        property.property_type === "condo"
+                                            ? "selected"
+                                            : ""
+                                    }>Condominium</option>
+                                    <option value="townhouse" ${
+                                        property.property_type === "townhouse"
+                                            ? "selected"
+                                            : ""
+                                    }>Townhouse</option>
+                                    <option value="single-family" ${
+                                        property.property_type ===
+                                        "single-family"
+                                            ? "selected"
+                                            : ""
+                                    }>Single Family Home</option>
+                                    <option value="duplex" ${
+                                        property.property_type === "duplex"
+                                            ? "selected"
+                                            : ""
+                                    }>Duplex</option>
+                                    <option value="commercial" ${
+                                        property.property_type === "commercial"
+                                            ? "selected"
+                                            : ""
+                                    }>Commercial</option>
                                 </select>
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Property Address</label>
-                            <input type="text" name="property_address" value="${property.property_address}" required 
+                            <input type="text" name="property_address" value="${
+                                property.property_address
+                            }" required 
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
 
@@ -219,7 +275,9 @@ async function openEditPropertyModal(propertyId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Property Price</label>
                                 <div class="relative">
                                     <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
-                                    <input type="number" name="property_price" value="${property.property_price}" required min="0" step="0.01"
+                                    <input type="number" name="property_price" value="${
+                                        property.property_price
+                                    }" required min="0" step="0.01"
                                         class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                             </div>
@@ -227,22 +285,34 @@ async function openEditPropertyModal(propertyId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Property Image</label>
                                 <input type="file" name="property_image" accept="image/*"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                <p class="mt-1 text-sm text-gray-500">Current image: ${property.property_image}</p>
+                                <p class="mt-1 text-sm text-gray-500">Current image: ${
+                                    property.property_image
+                                }</p>
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Property Description</label>
                             <textarea name="property_description" rows="4" required
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">${property.property_description}</textarea>
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">${
+                                        property.property_description
+                                    }</textarea>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                             <select name="status" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                <option value="active" ${property.status === "active" ? "selected" : ""}>Active</option>
-                                <option value="inactive" ${property.status === "inactive" ? "selected" : ""}>Inactive</option>
+                                <option value="active" ${
+                                    property.status === "active"
+                                        ? "selected"
+                                        : ""
+                                }>Active</option>
+                                <option value="inactive" ${
+                                    property.status === "inactive"
+                                        ? "selected"
+                                        : ""
+                                }>Inactive</option>
                             </select>
                         </div>
 
@@ -275,12 +345,18 @@ async function openEditPropertyModal(propertyId) {
                                           (unit) => `
                             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                                 <div class="flex justify-between items-start mb-3">
-                                    <h4 class="font-semibold text-gray-900">${unit.unit_name}</h4>
+                                    <h4 class="font-semibold text-gray-900">${
+                                        unit.unit_name
+                                    }</h4>
                                     <div class="flex space-x-2">
-                                        <button onclick="editUnit(${unit.unit_id})" class="text-blue-600 hover:text-blue-800">
+                                        <button onclick="editUnit(${
+                                            unit.unit_id
+                                        })" class="text-blue-600 hover:text-blue-800">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button onclick="deleteUnit(${unit.unit_id})" class="text-red-600 hover:text-red-800">
+                                        <button onclick="deleteUnit(${
+                                            unit.unit_id
+                                        })" class="text-red-600 hover:text-red-800">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
@@ -292,7 +368,9 @@ async function openEditPropertyModal(propertyId) {
                                     </div>
                                     <div>
                                         <span class="font-medium">Type:</span>
-                                        <span class="capitalize">${unit.unit_type}</span>
+                                        <span class="capitalize">${
+                                            unit.unit_type
+                                        }</span>
                                     </div>
                                     <div>
                                         <span class="font-medium">Area:</span>
@@ -300,17 +378,21 @@ async function openEditPropertyModal(propertyId) {
                                     </div>
                                     <div>
                                         <span class="font-medium">Price:</span>
-                                        <span class="font-semibold">₱${parseFloat(unit.unit_price).toLocaleString()}</span>
+                                        <span class="font-semibold">₱${parseFloat(
+                                            unit.unit_price
+                                        ).toLocaleString()}</span>
                                     </div>
                                     <div class="col-span-2">
                                         <span class="font-medium">Status:</span>
-                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(unit.status)}">
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                                            unit.status
+                                        )}">
                                             ${unit.status}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                        `,
+                        `
                                       )
                                       .join("")
                                 : `
@@ -342,12 +424,18 @@ async function openEditPropertyModal(propertyId) {
                                           (device) => `
                             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                                 <div class="flex justify-between items-start mb-3">
-                                    <h4 class="font-semibold text-gray-900">${device.device_name}</h4>
+                                    <h4 class="font-semibold text-gray-900">${
+                                        device.device_name
+                                    }</h4>
                                     <div class="flex space-x-2">
-                                        <button onclick="editDevice(${device.device_id})" class="text-blue-600 hover:text-blue-800">
+                                        <button onclick="editDevice(${
+                                            device.device_id
+                                        })" class="text-blue-600 hover:text-blue-800">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button onclick="deleteDevice(${device.device_id})" class="text-red-600 hover:text-red-800">
+                                        <button onclick="deleteDevice(${
+                                            device.device_id
+                                        })" class="text-red-600 hover:text-red-800">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -355,17 +443,28 @@ async function openEditPropertyModal(propertyId) {
                                 <div class="space-y-2 text-sm text-gray-600">
                                     <div class="flex justify-between">
                                         <span>Type:</span>
-                                        <span class="capitalize">${device.device_type}</span>
+                                        <span class="capitalize">${
+                                            device.device_type
+                                        }</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span>Status:</span>
-                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${device.connection_status === "online" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                                            device.connection_status ===
+                                            "online"
+                                                ? "bg-green-100 text-green-800"
+                                                : "bg-red-100 text-red-800"
+                                        }">
                                             ${device.connection_status}
                                         </span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span>Power:</span>
-                                        <span class="capitalize ${device.power_status === "on" ? "text-green-600" : "text-red-600"}">${device.power_status}</span>
+                                        <span class="capitalize ${
+                                            device.power_status === "on"
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                        }">${device.power_status}</span>
                                     </div>
                                     ${
                                         device.model
@@ -389,7 +488,7 @@ async function openEditPropertyModal(propertyId) {
                                     }
                                 </div>
                             </div>
-                        `,
+                        `
                                       )
                                       .join("")
                                 : `
@@ -414,7 +513,7 @@ async function openEditPropertyModal(propertyId) {
         console.error("Error details:", error.message);
         alert(
             "Error loading property for editing. Please try again. Error: " +
-                error.message,
+                error.message
         );
     }
 }
@@ -455,10 +554,24 @@ async function addPropertyUnit(propertyId) {
                     Accept: "application/json",
                 },
                 body: JSON.stringify(unitData),
-            },
+            }
         );
 
-        const result = await response.json();
+        const result = await (async () => {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error(
+                    "Non-JSON response from server:",
+                    response.status,
+                    text
+                );
+                throw new Error(
+                    `Server returned non-JSON response (status ${response.status}). Check console for HTML.`
+                );
+            }
+            return await response.json();
+        })();
 
         if (!response.ok) {
             throw new Error(result.message || "Failed to add unit");
@@ -499,19 +612,19 @@ function switchEditTab(tabName) {
     // Show selected tab content
     document
         .getElementById(
-            `edit${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Content`,
+            `edit${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Content`
         )
         .classList.remove("hidden");
 
     // Add active styles to selected tab
     document
         .getElementById(
-            `edit${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`,
+            `edit${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`
         )
         .classList.add("border-blue-500", "text-blue-600");
     document
         .getElementById(
-            `edit${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`,
+            `edit${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`
         )
         .classList.remove("border-transparent", "text-gray-500");
 }
@@ -538,7 +651,7 @@ async function editPropertyUnit(unitId) {
             throw new Error("Failed to fetch unit data");
         }
 
-        const unit = await response.json();
+        const unit = await parseJsonOrThrow(response);
 
         const modalContent = `
             <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -562,12 +675,16 @@ async function editPropertyUnit(unitId) {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Unit Name</label>
-                                <input type="text" name="unit_name" value="${unit.unit_name}" required 
+                                <input type="text" name="unit_name" value="${
+                                    unit.unit_name
+                                }" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Unit Number</label>
-                                <input type="number" name="unit_num" value="${unit.unit_num}" required min="1"
+                                <input type="number" name="unit_num" value="${
+                                    unit.unit_num
+                                }" required min="1"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                         </div>
@@ -577,19 +694,53 @@ async function editPropertyUnit(unitId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Unit Type</label>
                                 <select name="unit_type" required 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="studio" ${unit.unit_type === "studio" ? "selected" : ""}>Studio</option>
-                                    <option value="1-bedroom" ${unit.unit_type === "1-bedroom" ? "selected" : ""}>1 Bedroom</option>
-                                    <option value="2-bedroom" ${unit.unit_type === "2-bedroom" ? "selected" : ""}>2 Bedroom</option>
-                                    <option value="3-bedroom" ${unit.unit_type === "3-bedroom" ? "selected" : ""}>3 Bedroom</option>
-                                    <option value="penthouse" ${unit.unit_type === "penthouse" ? "selected" : ""}>Penthouse</option>
-                                    <option value="loft" ${unit.unit_type === "loft" ? "selected" : ""}>Loft</option>
-                                    <option value="duplex" ${unit.unit_type === "duplex" ? "selected" : ""}>Duplex</option>
-                                    <option value="commercial" ${unit.unit_type === "commercial" ? "selected" : ""}>Commercial</option>
+                                    <option value="studio" ${
+                                        unit.unit_type === "studio"
+                                            ? "selected"
+                                            : ""
+                                    }>Studio</option>
+                                    <option value="1-bedroom" ${
+                                        unit.unit_type === "1-bedroom"
+                                            ? "selected"
+                                            : ""
+                                    }>1 Bedroom</option>
+                                    <option value="2-bedroom" ${
+                                        unit.unit_type === "2-bedroom"
+                                            ? "selected"
+                                            : ""
+                                    }>2 Bedroom</option>
+                                    <option value="3-bedroom" ${
+                                        unit.unit_type === "3-bedroom"
+                                            ? "selected"
+                                            : ""
+                                    }>3 Bedroom</option>
+                                    <option value="penthouse" ${
+                                        unit.unit_type === "penthouse"
+                                            ? "selected"
+                                            : ""
+                                    }>Penthouse</option>
+                                    <option value="loft" ${
+                                        unit.unit_type === "loft"
+                                            ? "selected"
+                                            : ""
+                                    }>Loft</option>
+                                    <option value="duplex" ${
+                                        unit.unit_type === "duplex"
+                                            ? "selected"
+                                            : ""
+                                    }>Duplex</option>
+                                    <option value="commercial" ${
+                                        unit.unit_type === "commercial"
+                                            ? "selected"
+                                            : ""
+                                    }>Commercial</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Area (sqm)</label>
-                                <input type="number" name="area_sqm" value="${unit.area_sqm}" required min="1" step="0.01"
+                                <input type="number" name="area_sqm" value="${
+                                    unit.area_sqm
+                                }" required min="1" step="0.01"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             </div>
                         </div>
@@ -599,7 +750,9 @@ async function editPropertyUnit(unitId) {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Unit Price</label>
                                 <div class="relative">
                                     <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
-                                    <input type="number" name="unit_price" value="${unit.unit_price}" required min="0" step="0.01"
+                                    <input type="number" name="unit_price" value="${
+                                        unit.unit_price
+                                    }" required min="0" step="0.01"
                                         class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                             </div>
@@ -695,7 +848,7 @@ async function updatePropertyUnit(unitId) {
 
         // Refresh the parent property edit modal
         const propertyId = document.querySelector(
-            'input[name="prop_id"]',
+            'input[name="prop_id"]'
         )?.value;
         if (propertyId) {
             refreshUnitsList(propertyId);
@@ -711,7 +864,7 @@ async function updatePropertyUnit(unitId) {
 async function deletePropertyUnit(unitId) {
     if (
         !confirm(
-            "Are you sure you want to archive this unit? The unit will be marked as inactive and hidden from active listings.",
+            "Are you sure you want to archive this unit? The unit will be marked as inactive and hidden from active listings."
         )
     ) {
         return;
@@ -735,7 +888,7 @@ async function deletePropertyUnit(unitId) {
 
         // Refresh units list
         const propertyId = document.querySelector(
-            'input[name="prop_id"]',
+            'input[name="prop_id"]'
         )?.value;
         if (propertyId) {
             refreshUnitsList(propertyId);
@@ -751,14 +904,14 @@ async function deletePropertyUnit(unitId) {
 async function refreshUnitsList(propertyId) {
     try {
         const response = await fetch(
-            `/landlord/properties/${propertyId}/units`,
+            `/landlord/properties/${propertyId}/units`
         );
 
         if (!response.ok) {
             throw new Error("Failed to fetch units");
         }
 
-        const units = await response.json();
+        const units = await parseJsonOrThrow(response);
         const unitsContainer = document.getElementById("editUnitsList");
 
         if (!unitsContainer) return;
@@ -782,12 +935,18 @@ async function refreshUnitsList(propertyId) {
                 (unit) => `
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div class="flex justify-between items-start mb-3">
-                    <h4 class="font-semibold text-gray-900">${unit.unit_name}</h4>
+                    <h4 class="font-semibold text-gray-900">${
+                        unit.unit_name
+                    }</h4>
                     <div class="flex space-x-2">
-                        <button onclick="editUnit(${unit.unit_id})" class="text-blue-600 hover:text-blue-800">
+                        <button onclick="editUnit(${
+                            unit.unit_id
+                        })" class="text-blue-600 hover:text-blue-800">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button onclick="deleteUnit(${unit.unit_id})" class="text-red-600 hover:text-red-800">
+                        <button onclick="deleteUnit(${
+                            unit.unit_id
+                        })" class="text-red-600 hover:text-red-800">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -807,17 +966,21 @@ async function refreshUnitsList(propertyId) {
                     </div>
                     <div>
                         <span class="font-medium">Price:</span>
-                        <span class="font-semibold">₱${parseFloat(unit.unit_price).toLocaleString()}</span>
+                        <span class="font-semibold">₱${parseFloat(
+                            unit.unit_price
+                        ).toLocaleString()}</span>
                     </div>
                     <div class="col-span-2">
                         <span class="font-medium">Status:</span>
-                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(unit.status)}">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                            unit.status
+                        )}">
                             ${unit.status}
                         </span>
                     </div>
                 </div>
             </div>
-        `,
+        `
             )
             .join("");
     } catch (error) {
