@@ -17,7 +17,8 @@ RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available
 COPY . /var/www/html/
 
 # Create uploads folder and set permissions
-RUN mkdir -p /var/www/html/public/uploads \
+RUN mkdir -p /var/www/html/public/storage/images/uploadDocs \
+  && mkdir -p /var/www/html/public/storage/property_images \  
   && chown -R www-data:www-data /var/www/html/public/uploads \
   && chmod -R 775 /var/www/html/public/uploads
 
@@ -29,7 +30,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Install Laravel dependencies
 RUN composer install --no-dev --optimize-autoloader
-
+RUN php artisan storage:link
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
