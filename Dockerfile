@@ -1,18 +1,30 @@
-# Use PHP 8.4 (required by your composer.lock)
-# Start with a base that includes both PHP and Apache
-FROM php:8.4-apache
+# =================================================================
+# Stage 1: Frontend Build (Builds Vite assets with Node)
+# =================================================================
+FROM node:20 AS frontend
+WORKDIR /app
+COPY package*.json ./
 
-# 1. Install System Dependencies (PHP/Laravel/Git)
+# Install only necessary Node dependencies
+RUN npm install
+
+# Copy application files needed for the frontend build
+COPY . .
+
+# Run the Vite build, which creates public/dist
+RUN npm run build 
+
+# =================================================================
+# Stage 2: Backend/Runtime (PHP + Apache)
+# =================================================================
+# Start with the lean PHP 8.4-apache base
+FROM php:8.4-apache AS backend
+
+# 1. Install System Dependencies (Laravel/Git)
+# We only install system dependencies required by PHP extensions, not Node.
 RUN apt-get update && apt-get install -y \
     git unzip libpq-dev libzip-dev zip libxml2-dev zlib1g-dev libonig-dev \
-    # Add Node/NPM dependencies for the frontend build
-    curl gnupg \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip bcmath mbstring
-
-# 2. Install Node.js (Required for Vite/npm)
-# Install a stable Node.js version (e.g., 20 LTS)
-RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
@@ -27,24 +39,22 @@ COPY . /var/www/html/
 # Set working dir
 WORKDIR /var/www/html
 
-# 3. Install Composer
+# 2. Install Composer (Only installed once)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# 4. 🔥 BUILD FRONTEND ASSETS (THE MISSING STEP) 🔥
-# Install NPM dependencies
-RUN npm install
-# Run the Vite build command to generate assets in public/dist
-RUN npm run build 
+# 3. ⭐️ COPY BUILT ASSETS (From Stage 1) ⭐️
+# This copies ONLY the compiled files and the manifest.json
+COPY --from=frontend /app/public/dist /var/www/html/public/dist
 
 # Create uploads folder and set permissions
 RUN mkdir -p /var/www/html/public/uploads \
     && chown -R www-data:www-data /var/www/html/public/uploads \
     && chmod -R 775 /var/www/html/public/uploads
 
-# Set permissions
+# Set final permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 10000

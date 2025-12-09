@@ -27,14 +27,36 @@ class StaffController extends Controller
         
         // Get urgent maintenance requests
         $urgentRequests = $this->getUrgentRequests($user);
-        
+
+        // Build a lightweight stats array for the dashboard view
+        $maintenanceRequests = MaintenanceRequest::where('assigned_staff_id', $user->user_id)
+            ->get()
+            ->map(function ($r) {
+                $r->days_open = $r->created_at ? now()->diffInDays($r->created_at) : 0;
+                return $r;
+            });
+
+        $stats = [
+            'total_tasks' => $maintenanceRequests->count(),
+            'in_progress' => $maintenanceRequests->where('status', 'in_progress')->count(),
+            'completed' => $maintenanceRequests->where('status', 'completed')->count(),
+            'pending' => $maintenanceRequests->where('status', 'pending')->count(),
+            'cancelled' => $maintenanceRequests->where('status', 'cancelled')->count(),
+            'high_priority' => $maintenanceRequests->whereIn('priority', ['urgent', 'high'])->count(),
+            'urgent' => $maintenanceRequests->where('priority', 'urgent')->count(),
+            'total_cost' => 0,
+            'avg_days_open' => $maintenanceRequests->where('status', '!=', 'completed')->avg('days_open') ?? 0
+        ];
+
         return view('staff.dashboard', [
             'maintenanceStats' => $maintenanceStats,
             'recentActivities' => $recentActivities,
             'assignedProperties' => $assignedProperties,
             'upcomingTasks' => $upcomingTasks,
             'urgentRequests' => $urgentRequests,
-            'user' => $user
+            'user' => $user,
+            'maintenanceRequests' => $maintenanceRequests,
+            'stats' => $stats,
         ]);
     }
 
@@ -53,9 +75,13 @@ class StaffController extends Controller
             ->where('status', '!=', 'completed')
             ->count();
         
-        // Calculate completion rate
+        // Calculate overall completion rate (Completed Ever / Total Assigned Ever)
+        $completedTotal = MaintenanceRequest::where('assigned_staff_id', $user->user_id)
+            ->where('status', 'completed')
+            ->count();
+
         $completionRate = $totalAssigned > 0 
-            ? round(($completedThisMonth / $totalAssigned) * 100, 1)
+            ? round(($completedTotal / $totalAssigned) * 100, 1)
             : 0;
         
         return [
@@ -63,7 +89,7 @@ class StaffController extends Controller
             'in_progress' => $inProgress,
             'completed_this_month' => $completedThisMonth,
             'urgent_pending' => $urgentPending,
-            'completion_rate' => $completionRate
+            'completion_rate' => $completionRate // Now represents overall rate
         ];
     }
 
@@ -75,6 +101,9 @@ class StaffController extends Controller
             ->limit(5)
             ->get()
             ->map(function ($request) {
+                // Use combined visual helper
+                $visuals = $this->getRequestVisuals($request->status, $request->priority);
+
                 return [
                     'id' => $request->request_id,
                     'title' => $request->title,
@@ -83,8 +112,8 @@ class StaffController extends Controller
                     'status' => $request->status,
                     'priority' => $request->priority,
                     'updated_at' => $request->updated_at,
-                    'icon' => $this->getActivityIcon($request->status, $request->priority),
-                    'icon_color' => $this->getActivityColor($request->status, $request->priority)
+                    'icon' => $visuals['icon'],
+                    'icon_color' => $visuals['color']
                 ];
             });
     }
@@ -116,70 +145,83 @@ class StaffController extends Controller
             ->take(3);
     }
 
+    /**
+     * Retrieves upcoming tasks ordered by submission date (oldest first).
+     */
     private function getUpcomingTasks($user)
     {
         return MaintenanceRequest::with(['unit.property', 'user'])
             ->where('assigned_staff_id', $user->user_id)
             ->where('status', 'in_progress')
-            ->orderBy('requested_at', 'asc')
+            ->orderBy('created_at', 'asc') // FIX: Changed requested_at to created_at
             ->limit(3)
             ->get()
             ->map(function ($request) {
-                $request->days_open = now()->diffInDays($request->requested_at);
-                $request->property_name = optional(optional($request->unit)->property)->property_name ?? 'Unknown';
-                $request->unit_number = optional($request->unit)->unit_num ?? 'N/A';
-                $request->tenant_name = optional($request->user)->first_name . ' ' . optional($request->user)->last_name;
-                return $request;
+                // Return a clean array instead of mutating the model
+                return [
+                    'id' => $request->request_id,
+                    'title' => $request->title,
+                    'days_open' => now()->diffInDays($request->created_at), // FIX: Changed requested_at to created_at
+                    'priority' => $request->priority,
+                    'property_name' => optional(optional($request->unit)->property)->property_name ?? 'Unknown',
+                    'unit_number' => optional($request->unit)->unit_num ?? 'N/A',
+                    'tenant_name' => optional($request->user)->first_name . ' ' . optional($request->user)->last_name,
+                ];
             });
     }
 
+    /**
+     * Retrieves urgent requests, ordered by priority, then submission date (oldest first).
+     */
     private function getUrgentRequests($user)
     {
         return MaintenanceRequest::with(['unit.property', 'user'])
             ->where('assigned_staff_id', $user->user_id)
             ->whereIn('priority', ['urgent', 'high'])
             ->where('status', '!=', 'completed')
-            ->orderBy('priority', 'desc')
-            ->orderBy('requested_at', 'asc')
+            ->orderByRaw("FIELD(priority, 'urgent', 'high')") // Ensures Urgent is first
+            ->orderBy('created_at', 'asc') // FIX: Changed requested_at to created_at
             ->limit(3)
             ->get()
             ->map(function ($request) {
-                $request->days_open = now()->diffInDays($request->requested_at);
-                $request->property_name = optional(optional($request->unit)->property)->property_name ?? 'Unknown';
-                $request->unit_number = optional($request->unit)->unit_num ?? 'N/A';
-                return $request;
+                // Return a clean array instead of mutating the model
+                return [
+                    'id' => $request->request_id,
+                    'title' => $request->title,
+                    'priority' => $request->priority,
+                    'days_open' => now()->diffInDays($request->created_at), // FIX: Changed requested_at to created_at
+                    'property_name' => optional(optional($request->unit)->property)->property_name ?? 'Unknown',
+                    'unit_number' => optional($request->unit)->unit_num ?? 'N/A',
+                ];
             });
     }
 
-    private function getActivityIcon($status, $priority)
+    /**
+     * Combined helper for getting icon and color based on status and priority.
+     */
+    private function getRequestVisuals($status, $priority)
     {
-        if ($priority == 'urgent') {
-            return 'fas fa-exclamation-triangle';
-        } elseif ($priority == 'high') {
-            return 'fas fa-exclamation-circle';
-        } elseif ($status == 'completed') {
-            return 'fas fa-check-circle';
-        } elseif ($status == 'in_progress') {
-            return 'fas fa-tools';
+        $visuals = [
+            'urgent' => ['icon' => 'fas fa-exclamation-triangle', 'color' => 'red'],
+            'high' => ['icon' => 'fas fa-exclamation-circle', 'color' => 'orange'],
+            'completed' => ['icon' => 'fas fa-check-circle', 'color' => 'green'],
+            'in_progress' => ['icon' => 'fas fa-tools', 'color' => 'blue'],
+            'default' => ['icon' => 'fas fa-clock', 'color' => 'yellow'],
+        ];
+
+        // Priority overrides status
+        if ($priority === 'urgent') {
+            return $visuals['urgent'];
+        } elseif ($priority === 'high') {
+            return $visuals['high'];
+        } elseif (isset($visuals[$status])) {
+            return $visuals[$status];
         } else {
-            return 'fas fa-clock';
+            return $visuals['default'];
         }
     }
 
-    private function getActivityColor($status, $priority)
-    {
-        if ($priority == 'urgent') {
-            return 'red';
-        } elseif ($priority == 'high') {
-            return 'orange';
-        } elseif ($status == 'completed') {
-            return 'green';
-        } elseif ($status == 'in_progress') {
-            return 'blue';
-        } else {
-            return 'yellow';
-        }
-    }
+    // --- Main Maintenance View Method ---
 
     public function maintenance()
     {
@@ -206,7 +248,7 @@ class StaffController extends Controller
             ->get()
             ->map(function ($request) {
                 // Calculate days open (always calculate it)
-                $request->days_open = $request->requested_at ? now()->diffInDays($request->requested_at) : 0;
+                $request->days_open = $request->created_at ? now()->diffInDays($request->created_at) : 0; // FIX: Changed requested_at to created_at
                 $request->property_name = optional(optional($request->unit)->property)->property_name ?? 'Unknown Property';
                 $request->unit_number = optional($request->unit)->unit_num ?? 'N/A';
                 
@@ -232,6 +274,7 @@ class StaffController extends Controller
             'high_priority' => $maintenanceRequests->whereIn('priority', ['urgent', 'high'])->count(),
             'urgent' => $maintenanceRequests->where('priority', 'urgent')->count(),
             'total_cost' => 0,
+            // Calculate avg days open only for tasks not yet completed
             'avg_days_open' => $maintenanceRequests->where('status', '!=', 'completed')->avg('days_open') ?? 0
         ];
         
@@ -266,6 +309,11 @@ class StaffController extends Controller
         // If moving from completed to another status, clear completed_at
         if ($maintenanceRequest->getOriginal('status') == 'completed' && $validated['status'] != 'completed') {
             $maintenanceRequest->completed_at = null;
+        }
+        
+        // Save completion notes if provided
+        if (isset($validated['completion_notes'])) {
+            $maintenanceRequest->completion_notes = $validated['completion_notes'];
         }
         
         $maintenanceRequest->save();
