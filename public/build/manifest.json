@@ -9,9 +9,18 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-Dr4chDrF.js",
+    "file": "assets/app-YS56ID4l.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true,
+    "imports": [
+      "resources/js/register.js"
+    ]
+  },
+  "resources/js/register.js": {
+    "file": "assets/register-n3esE2sm.js",
+    "name": "register",
+    "src": "resources/js/register.js",
     "isEntry": true
   }
 }

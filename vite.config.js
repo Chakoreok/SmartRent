@@ -5,19 +5,17 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
     plugins: [
         laravel({
-            // 🚀 FIX: Add the missing JavaScript file to the input array
             input: [
                 "resources/css/app.css",
                 "resources/js/app.js",
-                "resources/js/register.js", // <--- ADDED THIS LINE
+                "resources/js/register.js", // your file
             ],
             refresh: true,
         }),
         tailwindcss(),
     ],
     build: {
-        // Output compiled assets to 'public/dist' folder
-        outDir: "public/dist",
+        outDir: "public/build", // FIX HERE ✔
         emptyOutDir: true,
     },
 });
